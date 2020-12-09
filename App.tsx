@@ -1,51 +1,63 @@
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, ActivityIndicator, StyleSheet, Text, View, Button } from 'react-native';
 import DropDown from './src/components/dropdown';
+import { ReadState, SaveState } from './src/utility/dataStore';
 
-const axios = require('axios');
-const BoredApi = 'http://www.boredapi.com/api/activity?type=';
 
+const stateActive = 'active';
+const changeListener = 'change';
+const inactiveRegex = /inactive|background/;
 
 export default function App() {
     const [isLoading, setLoading] = useState(false);
     const [selectedActivity, setActivity] = useState('');
     const [message, setMessage] = useState('Select Activity');
 
+    const appState = useRef(AppState.currentState);
+    const handleStateChange = async (nextAppState) => {
+        if (appState.current === stateActive
+            && nextAppState.match(inactiveRegex)) {
+            await SaveState({ selectedActivity, message });
+        }
+    };
+
+    const readState = () => {
+        ReadState().then((state) => {
+            if (state !== null) {
+                setActivity(state.selectedActivity);
+                setMessage(state.message);
+            }
+
+            setLoading(false);
+        }).catch((err) => {
+            setLoading(false);
+        })
+    }
+
     useEffect(() => {
         setLoading(true);
-        if (selectedActivity !== '') {
-            axios.get(`${BoredApi}${selectedActivity}`)
-                .then((response) => {
-                    console.log(response);
-                    setLoading(false);
-                })
-                .catch((err) => {
-                    setMessage('Error fetching message');
-                    setLoading(false);
-                });
-        }
-    }, [selectedActivity])
+        AppState.addEventListener(changeListener, handleStateChange);
 
-    useEffect(() => {
-
-        return () => {
-            
-        }
-    })
+        readState();
+    }, []);
 
     return (
         <View style={styles.container}>
-
-            <DropDown value={selectedActivity} updateValue={setActivity} />
-            <View style={[styles.flexOne]}>
-                {isLoading && <ActivityIndicator size={"large"} />}
+            <DropDown
+                updateValue={setActivity}
+                updateMessage={setMessage}
+                setLoading={setLoading}
+            />
+            <View style={{ marginBottom: 10 }}>
+                {isLoading && <ActivityIndicator size={"large"} color={"blue"} />}
                 {!isLoading && (
                     <Text>{message}</Text>
                 )}
             </View>
-            <Text>Open up App.tsx to start working on your app!</Text>
-            <StatusBar style="auto" />
+            <Button
+                title={"refetch"}
+                onPress={readState}
+            />
         </View>
     );
 }
