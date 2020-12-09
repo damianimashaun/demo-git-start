@@ -1,22 +1,31 @@
 import { Picker } from '@react-native-picker/picker';
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import ActivityTypes from '../activityTypes';
 import axios from 'axios';
 const BoredApi = 'http://www.boredapi.com/api/activity?type=';
 
 type myProps = {
+    set: string;
     updateValue: Function;
     updateMessage:  Function,
     setLoading: Function
 }
 
-const dropDown = ({ updateValue, updateMessage, setLoading }: myProps) => {
+const dropDown = ({ set, updateValue, updateMessage, setLoading }: myProps) => {
     const [value, setValue] = useState('');
+    const hasSet = useRef(false);
+
+    useEffect(() => {
+        if (set !== '') {
+            hasSet.current = true;
+            setValue(set);
+        }
+    }, [set])
 
     useEffect(() => {
         setLoading(true);
-        if (value !== '') {
+        if (value !== '' && !hasSet.current) {
             axios.get(`${BoredApi}${value}`)
                 .then((response) => {
                     updateMessage(response.data.activity);
@@ -26,6 +35,9 @@ const dropDown = ({ updateValue, updateMessage, setLoading }: myProps) => {
                     updateMessage('Error fetching message');
                     setLoading(false);
                 });
+        } else if (hasSet.current) {
+            setLoading(false);
+            hasSet.current = false;
         }
     }, [value])
 

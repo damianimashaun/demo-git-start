@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ActivityIndicator, StyleSheet, Text, View, Button } from 'react-native';
 import DropDown from './src/components/dropdown';
-import { ReadState, SaveState } from './src/utility/dataStore';
+import { ClearState, ReadState, SaveState } from './src/utility/dataStore';
 
 
 const stateActive = 'active';
@@ -10,21 +10,39 @@ const inactiveRegex = /inactive|background/;
 
 export default function App() {
     const [isLoading, setLoading] = useState(false);
+    const [previousActivity, setPreviousActivity] = useState('');
     const [selectedActivity, setActivity] = useState('');
     const [message, setMessage] = useState('Select Activity');
+    const activityRef = React.useRef('');
+    const messageRef = React.useRef('');
+
+    useEffect(() => {
+        activityRef.current = selectedActivity;
+        messageRef.current = message
+    }, [selectedActivity, message])
 
     const appState = useRef(AppState.currentState);
+
+    const saveState = async () => {
+        await SaveState({
+            selectedActivity: activityRef.current,
+            message: messageRef.current
+        });
+    }
     const handleStateChange = async (nextAppState) => {
         if (appState.current === stateActive
             && nextAppState.match(inactiveRegex)) {
-            await SaveState({ selectedActivity, message });
+            await ClearState();
+            await saveState();
         }
     };
 
     const readState = () => {
+        setLoading(true);
+
         ReadState().then((state) => {
             if (state !== null) {
-                setActivity(state.selectedActivity);
+                setPreviousActivity(state.selectedActivity);
                 setMessage(state.message);
             }
 
@@ -35,15 +53,18 @@ export default function App() {
     }
 
     useEffect(() => {
-        setLoading(true);
         AppState.addEventListener(changeListener, handleStateChange);
 
         readState();
+        return () => {
+            saveState();
+        }
     }, []);
 
     return (
         <View style={styles.container}>
             <DropDown
+                set={previousActivity}
                 updateValue={setActivity}
                 updateMessage={setMessage}
                 setLoading={setLoading}
@@ -56,7 +77,9 @@ export default function App() {
             </View>
             <Button
                 title={"refetch"}
-                onPress={readState}
+                onPress={() => {
+                    readState();
+                }}
             />
         </View>
     );
